@@ -7,6 +7,8 @@ import type {
   AnimatedViewStyleProp,
 } from '../../TypeDefinition';
 
+import animatedInterpolate from '../../utils/animatedInterpolate';
+
 /**
  * Utility that builds the style for the card in the cards stack.
  *
@@ -53,30 +55,30 @@ function forHorizontal(
   }
 
   const index = scene.index;
-  const inputRange = [index - 1, index, index + 1];
-
   const width = layout.initWidth;
-  const outputRange = I18nManager.isRTL
-    ? ([-width, 0, width * 0.3]: Array<number>)
-    : ([width, 0, width * -0.3]: Array<number>);
+  const interpolate = animatedInterpolate(props);
+
+  if (!interpolate) return { opacity: 0 };
 
   // Add [index - 1, index - 0.99] to the interpolated opacity for screen transition.
   // This makes the screen's shadow to disappear smoothly.
   const opacity = position.interpolate({
     inputRange: ([
-      index - 1,
-      index - 0.99,
+      interpolate.first,
+      interpolate.first + 0.01,
       index,
-      index + 0.99,
-      index + 1,
+      interpolate.last - 0.01,
+      interpolate.last,
     ]: Array<number>),
     outputRange: ([0, 1, 1, 0.85, 0]: Array<number>),
   });
 
   const translateY = 0;
   const translateX = position.interpolate({
-    inputRange,
-    outputRange,
+    inputRange: ([interpolate.first, index, interpolate.last]: Array<number>),
+    outputRange: I18nManager.isRTL
+      ? ([-width, 0, width * 0.3]: Array<number>)
+      : ([width, 0, width * -0.3]: Array<number>),
   });
 
   return {
@@ -99,21 +101,24 @@ function forVertical(
 
   const index = scene.index;
   const height = layout.initHeight;
+  const interpolate = animatedInterpolate(props);
+
+  if (!interpolate) return { opacity: 0 };
 
   const opacity = position.interpolate({
     inputRange: ([
-      index - 1,
-      index - 0.99,
+      interpolate.first,
+      interpolate.first + 0.01,
       index,
-      index + 0.99,
-      index + 1,
+      interpolate.last - 0.01,
+      interpolate.last,
     ]: Array<number>),
     outputRange: ([0, 1, 1, 0.85, 0]: Array<number>),
   });
 
   const translateX = 0;
   const translateY = position.interpolate({
-    inputRange: ([index - 1, index, index + 1]: Array<number>),
+    inputRange: ([interpolate.first, index, interpolate.last]: Array<number>),
     outputRange: ([height, 0, 0]: Array<number>),
   });
 
@@ -136,7 +141,16 @@ function forFadeFromBottomAndroid(
   }
 
   const index = scene.index;
-  const inputRange = [index - 1, index, index + 0.99, index + 1];
+  const interpolate = animatedInterpolate(props);
+
+  if (!interpolate) return { opacity: 0 };
+
+  const inputRange = ([
+    interpolate.first,
+    index,
+    interpolate.last - 0.01,
+    interpolate.last,
+  ]: Array<number>);
 
   const opacity = position.interpolate({
     inputRange,
@@ -155,6 +169,31 @@ function forFadeFromBottomAndroid(
   };
 }
 
+/**
+ *  fadeIn and fadeOut
+ */
+function forFade(props: NavigationSceneRendererProps): AnimatedViewStyleProp {
+  const { layout, position, scene } = props;
+
+  if (!layout.isMeasured) {
+    return forInitial(props);
+  }
+
+  const index = scene.index;
+  const interpolate = animatedInterpolate(props);
+
+  if (!interpolate) return { opacity: 0 };
+
+  const opacity = position.interpolate({
+    inputRange: ([interpolate.first, index, interpolate.last]: Array<number>),
+    outputRange: ([0, 1, 1]: Array<number>),
+  });
+
+  return {
+    opacity,
+  };
+}
+
 function canUseNativeDriver(): boolean {
   // The native driver can be enabled for this interpolator animating
   // opacity, translateX, and translateY is supported by the native animation
@@ -166,5 +205,6 @@ export default {
   forHorizontal,
   forVertical,
   forFadeFromBottomAndroid,
+  forFade,
   canUseNativeDriver,
 };
